@@ -33,7 +33,7 @@ RUN set -eux; \
 
 # Install docker-compose (V2, which is now the standard)
 # V2 is installed as a Docker CLI plugin, usually found at ~/.docker/cli-plugins/docker-compose
-ENV DOCKER_COMPOSE_VERSION="v2.24.5" # Check latest stable from https://github.com/docker/compose/releases
+ENV DOCKER_COMPOSE_VERSION="v2.24.5"
 RUN set -eux; \
     DOCKER_CONFIG=${DOCKER_CONFIG:-$HOME/.docker}; \
     mkdir -p $DOCKER_CONFIG/cli-plugins; \
@@ -57,7 +57,7 @@ COPY kind-config.yaml /kind-config.yaml
 # Install kubectl (updated to a recent stable version, matching Kind if possible or a common version like 1.30.x)
 # Always try to match kubectl version with the Kubernetes cluster version (kind) if possible.
 # For simplicity, let's pick a recent stable client.
-ENV KUBECTL_VERSION="v1.30.2" # Check latest stable from https://kubernetes.io/releases/
+ENV KUBECTL_VERSION="v1.30.2"
 RUN set -eux; \
     curl -LO "https://dl.k8s.io/release/${KUBECTL_VERSION}/bin/linux/amd64/kubectl"; \
     chmod +x ./kubectl; \
