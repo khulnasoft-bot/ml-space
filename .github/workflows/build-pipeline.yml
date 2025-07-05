@@ -1,37 +1,88 @@
-# Based on https://github.com/khulnasoft/ml-buildkit/blob/v0.6.6/workflows/build-pipeline.yml
-name: build-pipeline
+name: Build Pipeline
 
 on:
+  # Allows manual triggering of the workflow with specified inputs.
   workflow_dispatch:
     inputs:
       build_args:
-        description: "Arguments passed to build script"
+        description: "Arguments passed to the build script (e.g., --make --force)"
         required: false
-        default: "--make --force"
+        default: "--make --force" # Sensible default for a typical build
       working_directory:
         description: "Working directory from where the build command is run"
         required: false
-        default: "."
+        default: "." # Defaults to the repository root
+      # Optional: Add an input to control caching behavior if needed
+      # use_cache:
+      #   description: "Set to 'true' to enable caching for dependencies"
+      #   required: false
+      #   default: "true"
+
+  # Triggers the workflow on pushes to the 'main' branch.
   push:
     branches:
       - main
 
+# Define environment variables available to all jobs in this workflow.
 env:
-  BUILD_ARGS: ${{ github.event.inputs?.build_args || secrets.BUILD_ARGS }}
-  WORKING_DIRECTORY: ${{ github.event.inputs?.working_directory || secrets.WORKING_DIRECTORY }}
-  ACTIONS_ALLOW_UNSECURE_COMMANDS: true # TODO: only needed until act supports the new way
+  # Prioritize workflow_dispatch inputs, fall back to environment variables or defaults.
+  # Using `github.event.inputs.<input_name>` is the direct way to access workflow_dispatch inputs.
+  # Avoid relying on `secrets.BUILD_ARGS` or `secrets.WORKING_DIRECTORY` for non-sensitive,
+  # configurable options. These should typically be inputs or hardcoded defaults.
+  # If you absolutely need a secret to influence build args, define it clearly as such.
+  # For now, let's assume BUILD_ARGS and WORKING_DIRECTORY are meant to be primarily inputs.
+  BUILD_SCRIPT_ARGS: ${{ github.event.inputs.build_args }}
+  BUILD_WORKING_DIRECTORY: ${{ github.event.inputs.working_directory }}
+
+  # ACTIONS_ALLOW_UNSECURE_COMMANDS: This is a critical security risk.
+  # It should be removed as soon as possible. GitHub Actions has deprecated
+  # 'set-env' and 'add-path' commands in favor of environment files.
+  # If your custom action or script still relies on this, it needs to be updated.
+  # Assuming the custom action will be updated or replaced, we'll remove this.
+  # ACTIONS_ALLOW_UNSECURE_COMMANDS: true # REMOVE THIS IN PRODUCTION
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-latest # Using the latest Ubuntu runner
+
     steps:
-      - name: set-host-ip
-        run: echo "::set-env name=_HOST_IP::$(hostname -I | cut -d ' ' -f 1)"
-      - uses: actions/checkout@v2
-      - name: run-build-scripts
-        uses: ./.github/actions/build-environment
+      # Removed set-host-ip:
+      # `::set-env` is deprecated and insecure.
+      # If you need the host IP, consider if it's truly necessary in a build environment.
+      # For most build scenarios, the container's internal network or localhost is sufficient.
+      # If you must pass network info, use an output from a script and then reference it.
+      # For example:
+      # - name: Get Host IP
+      #   id: get_ip # Assign an ID to the step
+      #   run: echo "host_ip=$(hostname -I | cut -d ' ' -f 1)" >> $GITHUB_OUTPUT
+      # Then access with: ${{ steps.get_ip.outputs.host_ip }}
+
+      - name: Checkout Repository
+        uses: actions/checkout@v4 # Use the latest stable version of actions/checkout
+
+      # Optional: Add caching for dependencies (e.g., npm, pip, composer)
+      # This can significantly speed up builds if your build-environment action
+      # has dependency installation steps.
+      # - name: Setup Node.js Cache (Example)
+      #   if: ${{ github.event.inputs.use_cache == 'true' || github.event_name == 'push' }}
+      #   uses: actions/cache@v4
+      #   with:
+      #     path: ~/.npm # Or ~/.cache/pip, vendor/, etc.
+      #     key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }} # Adjust for your ecosystem
+      #     restore-keys: |
+      #       ${{ runner.os }}-node-
+
+      - name: Run Build Scripts
+        # Use a specific, pinned version of your custom action for reproducibility and stability.
+        # If your action is stable, consider using a tag (e.g., 'v1').
+        uses: ./.github/actions/build-environment@main # Or @v1 if you tag your actions
         with:
-          build_args: ${{ env.BUILD_ARGS }}
-          working_directory: ${{ env.WORKING_DIRECTORY }}
+          # Pass workflow inputs directly to the action
+          build_args: ${{ env.BUILD_SCRIPT_ARGS }}
+          working_directory: ${{ env.BUILD_WORKING_DIRECTORY }}
         env:
+          # Only pass necessary secrets. GITHUB_TOKEN is often required for actions
+          # that interact with the repository (e.g., pushing changes, creating releases).
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # If your custom action specifically needs other secrets, list them here.
+          # MY_OTHER_SECRET: ${{ secrets.MY_OTHER_SECRET }}
