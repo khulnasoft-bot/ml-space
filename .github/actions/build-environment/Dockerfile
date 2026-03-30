@@ -40,13 +40,9 @@ RUN set -eux; \
 # Stage 3: Container tools installation
 FROM java-runtime AS container-tools
 
-# Updated versions as of July 2025
-ENV DOCKER_COMPOSE_VERSION="v2.29.1" \
-    KIND_VERSION="v0.24.0" \
-    KUBECTL_VERSION="v1.31.0" \
-    HELM_VERSION="v3.15.3"
-
-# Install Docker Compose V2 as CLI plugin
+# Install docker-compose (V2, which is now the standard)
+# V2 is installed as a Docker CLI plugin, usually found at ~/.docker/cli-plugins/docker-compose
+ENV DOCKER_COMPOSE_VERSION="v2.24.5"
 RUN set -eux; \
     DOCKER_CONFIG=${DOCKER_CONFIG:-$HOME/.docker}; \
     mkdir -p $DOCKER_CONFIG/cli-plugins; \
@@ -65,7 +61,12 @@ RUN set -eux; \
     # Verify installation
     kind version
 
-# Install kubectl
+COPY kind-config.yaml /kind-config.yaml
+
+# Install kubectl (updated to a recent stable version, matching Kind if possible or a common version like 1.30.x)
+# Always try to match kubectl version with the Kubernetes cluster version (kind) if possible.
+# For simplicity, let's pick a recent stable client.
+ENV KUBECTL_VERSION="v1.30.2"
 RUN set -eux; \
     curl -LO "https://dl.k8s.io/release/${KUBECTL_VERSION}/bin/linux/amd64/kubectl"; \
     curl -LO "https://dl.k8s.io/release/${KUBECTL_VERSION}/bin/linux/amd64/kubectl.sha256"; \
